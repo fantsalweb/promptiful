@@ -75,6 +75,7 @@ Cada pregunta debe indicar en "apartado" a qué apartado del prompt final alimen
 B) Prompt final:
 {"type":"final","prompt":{
   "tipo_salida":"imagen | texto | codigo | datos | otro",
+  "necesita_fuentes":"true | false",
   "rol":"...",
   "contexto":"...",
   "tema":"...",
@@ -88,6 +89,7 @@ B) Prompt final:
 
 TIPO DE SALIDA Y ORDEN DE ENTREGA
 - tipo_salida clasifica lo que el usuario quiere obtener: "imagen" (cartel, logo, ilustración, foto, diseño gráfico o cualquier cosa visual que deba GENERARSE como imagen), "texto" (artículos, posts, emails, guiones...), "codigo", "datos" (tablas, análisis) u "otro".
+- necesita_fuentes: true solo si la tarea depende de información actual o verificable (noticias, datos, precios, normativa, estadísticas) que se beneficie de una búsqueda web con fuentes citadas; false en creación, redacción, código y similares.
 - REGLA DE ORO: el prompt debe lograr que la IA ENTREGUE el producto final, no una descripción, propuesta, esquema o guía sobre cómo hacerlo, salvo que el usuario pida eso expresamente.
 - orden_final es el último bloque del prompt: una orden imperativa, inequívoca, que fija el entregable.
 - Si tipo_salida es "imagen":
@@ -189,6 +191,8 @@ if (is_array($out) && ($out['type'] ?? '') === 'questions' && !$forceFinal
     }
     $tipo = strtolower(trim((string)($out['prompt']['tipo_salida'] ?? 'texto')));
     $out['prompt']['tipo_salida'] = in_array($tipo, ['imagen', 'texto', 'codigo', 'datos', 'otro'], true) ? $tipo : 'otro';
+    $nf = $out['prompt']['necesita_fuentes'] ?? false;
+    $out['prompt']['necesita_fuentes'] = is_bool($nf) ? $nf : in_array(strtolower(trim((string)$nf)), ['true', '1', 'si', 'sí', 'yes'], true);
     $valid = true;
 }
 

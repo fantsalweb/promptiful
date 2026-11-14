@@ -206,6 +206,30 @@
   #imgNote { margin: 0 0 12px; }
   .note { margin-top: 12px; font-size: 13px; color: var(--muted); line-height: 1.5; }
 
+  /* ---- Recomendador de IA ---- */
+  .rec-list { display: grid; gap: 10px; margin: 0 0 12px; padding: 0; list-style: none; }
+  .rec-item { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+  .rec-num { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--c); color: #fff; font: 600 18px Outfit, sans-serif; }
+  .rec-item.c-yellow .rec-num { color: #202124; }
+  .rec-body { flex: 1; min-width: 0; }
+  .rec-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 16px; font-weight: 500; }
+  .rec-star {
+    padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 500;
+    background: color-mix(in srgb, var(--c) 14%, transparent); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+  }
+  .rec-body p { margin: 2px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+  .rec-open { flex: none; padding: 8px 16px; border-radius: 18px; background: #1a73e8; color: #fff; font-size: 14px; text-decoration: none; }
+  .rec-open:hover { background: #1765cc; }
+  .rec-more { margin-top: 4px; }
+  .rec-more summary { cursor: pointer; font-size: 14px; color: var(--muted); padding: 6px 0; }
+  .rec-group { margin: 10px 0; }
+  .rec-reason { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+  @media (max-width: 520px) {
+    .rec-item { flex-wrap: wrap; }
+    .rec-body { flex-basis: calc(100% - 60px); }
+    .rec-open { margin-left: 50px; }
+  }
+
   .loader { display: flex; gap: 6px; justify-content: center; margin-top: 30px; }
   .loader[hidden] { display: none; }
   .loader i { width: 10px; height: 10px; border-radius: 50%; animation: bounce 1s infinite ease-in-out; }
@@ -455,9 +479,14 @@
       <button type="button" id="btnRegenerate">Generar otra versión</button>
     </div>
 
-    <p class="ia-title">Usar este prompt en:</p>
-    <p class="note" id="imgNote" hidden>Este prompt es para generar una imagen. Usa una IA con generación de imágenes (las atenuadas pueden limitarse a describir el diseño). Los generadores a veces fallan con textos largos y logotipos: si pasa, genera el fondo y la ilustración y añade los textos y logos oficiales después con un editor gráfico.</p>
-    <div class="ia-list" id="iaList"></div>
+    <p class="ia-title">Dónde usar este prompt</p>
+    <p class="note" id="imgNote" hidden>Este prompt es para generar una imagen. Los generadores a veces fallan con textos largos y logotipos: si pasa, genera el fondo y la ilustración y añade los textos y logos oficiales después con un editor gráfico.</p>
+    <ol class="rec-list" id="recList"></ol>
+    <details class="rec-more" id="recMore">
+      <summary>Otras opciones y por qué no son las primeras</summary>
+      <div id="recOthers"></div>
+    </details>
+    <p class="note" id="recNote"></p>
     <p class="note" id="iaNote">Al pulsar, el prompt se copia al portapapeles. En las IAs que lo admiten se abre con el prompt ya escrito; en el resto, solo tienes que pegarlo (Ctrl+V).</p>
   </section>
 </main>
@@ -487,22 +516,47 @@
     qPanel: $('questionsPanel'), qIntro: $('questionsIntro'), qForm: $('questionsForm'),
     send: $('btnSendAnswers'), skip: $('btnSkip'),
     rPanel: $('resultPanel'), output: $('output'), copy: $('btnCopy'), regen: $('btnRegenerate'),
-    iaList: $('iaList'), imgNote: $('imgNote'),
+    recList: $('recList'), recOthers: $('recOthers'), recNote: $('recNote'), recMore: $('recMore'), imgNote: $('imgNote'),
   };
 
-  // Webs de IA. "param" = parámetro de la URL que admite el prompt prellenado (si existe).
-  // Nota: estos parámetros no son oficiales y pueden cambiar; el copiado al portapapeles es el plan B.
-  const AIS = [
-    // img: true = suele ofrecer generación de imágenes (puede depender del plan o cambiar con el tiempo)
-    { name: 'ChatGPT',    url: 'https://chatgpt.com/',              param: 'q',  img: true },
-    { name: 'Claude',     url: 'https://claude.ai/new',             param: 'q',  img: false },
-    { name: 'Perplexity', url: 'https://www.perplexity.ai/search',  param: 'q',  img: false },
-    { name: 'Copilot',    url: 'https://copilot.microsoft.com/',    param: 'q',  img: true },
-    { name: 'Grok',       url: 'https://grok.com/',                 param: 'q',  img: true },
-    { name: 'Gemini',     url: 'https://gemini.google.com/app',     param: null, img: true },
-    { name: 'DeepSeek',   url: 'https://chat.deepseek.com/',        param: null, img: false },
-    { name: 'Mistral',    url: 'https://chat.mistral.ai/chat',      param: null, img: true },
-  ];
+  // ===== Catálogo de IAs y criterios del recomendador =====
+  // - `imagen` y `busqueda` son datos verificables; revísalos de vez en cuando
+  //   (la disponibilidad puede depender del plan o de la región).
+  //   busqueda: 2 = centrada en buscar y citar fuentes, 1 = incluye búsqueda web, 0 = no.
+  // - `afinidad` (0-5 por tipo de prompt) es CRITERIO EDITORIAL de Promptiful, no un ranking oficial:
+  //   ajústalo con tus propias pruebas. Los valores iniciales son orientativos.
+  // - `param` = parámetro de URL no oficial que admite el prompt prellenado (puede cambiar);
+  //   el copiado al portapapeles es el plan B.
+  const AI_CATALOG = {
+    revisado: 'noviembre de 2026',
+    ias: [
+      { name: 'ChatGPT', url: 'https://chatgpt.com/', param: 'q', imagen: true, busqueda: 1,
+        fortaleza: 'Asistente generalista y muy extendido.',
+        afinidad: { texto: 4, imagen: 5, codigo: 5, datos: 4, otro: 4 } },
+      { name: 'Claude', url: 'https://claude.ai/new', param: 'q', imagen: false, busqueda: 1,
+        fortaleza: 'Muy usado para redactar textos largos y programar.',
+        afinidad: { texto: 4, imagen: 0, codigo: 5, datos: 4, otro: 4 } },
+      { name: 'Perplexity', url: 'https://www.perplexity.ai/search', param: 'q', imagen: true, busqueda: 2,
+        fortaleza: 'Motor de respuestas que busca en la web y cita sus fuentes.',
+        limite: 'Está pensada sobre todo para buscar y citar fuentes, más que para crear contenido.',
+        afinidad: { texto: 2, imagen: 2, codigo: 2, datos: 3, otro: 3 } },
+      { name: 'Copilot', url: 'https://copilot.microsoft.com/', param: 'q', imagen: true, busqueda: 1,
+        fortaleza: 'Asistente de Microsoft, integrado con sus herramientas.',
+        afinidad: { texto: 3, imagen: 4, codigo: 3, datos: 3, otro: 3 } },
+      { name: 'Grok', url: 'https://grok.com/', param: 'q', imagen: true, busqueda: 1,
+        fortaleza: 'Asistente de xAI, con acceso a información de la red X.',
+        afinidad: { texto: 3, imagen: 3, codigo: 3, datos: 3, otro: 3 } },
+      { name: 'Gemini', url: 'https://gemini.google.com/app', param: null, imagen: true, busqueda: 1,
+        fortaleza: 'Asistente de Google, integrado con sus servicios.',
+        afinidad: { texto: 4, imagen: 5, codigo: 4, datos: 4, otro: 4 } },
+      { name: 'DeepSeek', url: 'https://chat.deepseek.com/', param: null, imagen: false, busqueda: 1,
+        fortaleza: 'Razonamiento y código, y de uso gratuito en su web.',
+        afinidad: { texto: 3, imagen: 0, codigo: 4, datos: 3, otro: 3 } },
+      { name: 'Mistral', url: 'https://chat.mistral.ai/chat', param: null, imagen: true, busqueda: 1,
+        fortaleza: 'Alternativa europea (Le Chat), con búsqueda web y plan gratuito.',
+        afinidad: { texto: 3, imagen: 4, codigo: 3, datos: 3, otro: 3 } },
+    ],
+  };
   const SECTION_COLOR = { rol: 'blue', contexto: 'red', tema: 'yellow', formato: 'green', tono: 'blue', ejemplo: 'red', restricciones: 'yellow', indicadores_exito: 'green', orden_final: 'blue' };
   const MAX_URL_PROMPT = 4000; // si el prompt codificado es más largo, no lo mandamos por URL
 
@@ -617,8 +671,9 @@
     show(el.qPanel, false);
     el.output.value = assemble(p);
     show(el.rPanel, true);
-    buildAiLinks(tipo);
-    saveCurrent(tipo);
+    const fuentes = p.necesita_fuentes === true;
+    buildAiLinks(tipo, fuentes);
+    saveCurrent(tipo, fuentes);
     el.rPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -641,28 +696,85 @@
     btn.textContent = msg; setTimeout(() => { btn.textContent = old; }, 1600);
   }
 
-  function buildAiLinks(tipo) {
-    const isImage = tipo === 'imagen';
-    show(el.imgNote, isImage);
-    el.iaList.replaceChildren();
-    // Si el prompt es para una imagen, primero las IAs que suelen generarlas
-    const list = isImage ? [...AIS].sort((a, b) => Number(b.img) - Number(a.img)) : AIS;
-    list.forEach(ai => {
-      const a = document.createElement('a');
-      a.textContent = ai.name; a.href = ai.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
-      if (isImage && !ai.img) {
-        a.classList.add('dim');
-        a.title = 'Esta IA puede no generar imágenes: es posible que solo describa el diseño.';
-      }
-      // Se calcula al hacer clic para usar la versión editada del textarea
-      a.addEventListener('click', () => {
-        const text = el.output.value.trim();
-        copyText(text);
-        const enc = encodeURIComponent(text);
-        a.href = (ai.param && enc.length <= MAX_URL_PROMPT) ? `${ai.url}?${ai.param}=${enc}` : ai.url;
-      });
-      el.iaList.append(a);
+  // ---- Recomendador de IA: orden por reglas a partir del catálogo (la IA de DeepSeek no decide el orden)
+  function recommend(tipo, fuentes) {
+    const t = ['texto', 'imagen', 'codigo', 'datos'].includes(tipo) ? tipo : 'otro';
+    const rows = AI_CATALOG.ias.map(ai => {
+      const blocked = t === 'imagen' && !ai.imagen;           // requisito imprescindible
+      let score = ai.afinidad[t] ?? 3;
+      if (fuentes) score += ai.busqueda === 2 ? 3 : (ai.busqueda === 1 ? 0 : -1);
+      return { ai, blocked, score };
     });
+    rows.sort((a, b) => (a.blocked - b.blocked) || (b.score - a.score)); // a igualdad, orden del catálogo
+    const top = rows.slice(0, 3).map(r => ({ ai: r.ai, why: reasonTop(r.ai, t, fuentes) }));
+    const groups = new Map(); // los motivos repetidos se agrupan
+    rows.slice(3).forEach(r => {
+      const why = reasonNot(r.ai, t, fuentes);
+      if (!groups.has(why)) groups.set(why, []);
+      groups.get(why).push(r.ai);
+    });
+    return { top, groups: [...groups].map(([why, ias]) => ({ why, ias })) };
+  }
+  function reasonTop(ai, t, fuentes) {
+    if (t === 'imagen') return `Genera imágenes de forma nativa. ${ai.fortaleza}`;
+    if (fuentes && ai.busqueda === 2) return 'Busca en la web y cita sus fuentes: encaja con un prompt que necesita información actual y verificable.';
+    if (fuentes && ai.busqueda === 1) return `${ai.fortaleza} Incluye búsqueda web (puede depender del plan).`;
+    return ai.fortaleza;
+  }
+  function reasonNot(ai, t, fuentes) {
+    if (t === 'imagen' && !ai.imagen) return 'No genera imágenes de forma nativa.';
+    if (fuentes && ai.busqueda !== 2) return 'Menos centrada en buscar y citar fuentes.';
+    if (ai.limite && (ai.afinidad[t] ?? 3) <= 2) return ai.limite;
+    return 'Buena alternativa, pero para este tipo de prompt las tres primeras encajan algo mejor según el criterio de Promptiful.';
+  }
+
+  // Enlace a una IA: copia el prompt (versión editada) y, si la web lo admite, lo abre ya escrito
+  function makeAiLink(ai, text, cls) {
+    const a = document.createElement('a');
+    a.textContent = text; a.href = ai.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    if (cls) a.className = cls;
+    a.title = `Copia el prompt y abre ${ai.name}`;
+    a.addEventListener('click', () => {
+      const prompt = el.output.value.trim();
+      copyText(prompt);
+      const enc = encodeURIComponent(prompt);
+      a.href = (ai.param && enc.length <= MAX_URL_PROMPT) ? `${ai.url}?${ai.param}=${enc}` : ai.url;
+    });
+    return a;
+  }
+
+  function buildAiLinks(tipo, fuentes = false) {
+    show(el.imgNote, tipo === 'imagen');
+    const { top, groups } = recommend(tipo, fuentes);
+    const colors = ['blue', 'red', 'yellow'];
+    el.recList.replaceChildren();
+    top.forEach(({ ai, why }, i) => {
+      const li = document.createElement('li'); li.className = 'rec-item c-' + colors[i];
+      const num = document.createElement('span'); num.className = 'rec-num'; num.textContent = String(i + 1);
+      const body = document.createElement('div'); body.className = 'rec-body';
+      const head = document.createElement('div'); head.className = 'rec-head';
+      const name = document.createElement('strong'); name.textContent = ai.name; head.append(name);
+      if (i === 0) {
+        const tag = document.createElement('span'); tag.className = 'rec-star'; tag.textContent = 'Recomendada'; head.append(tag);
+      }
+      const reason = document.createElement('p'); reason.textContent = why;
+      body.append(head, reason);
+      const open = makeAiLink(ai, 'Abrir', 'rec-open');
+      open.setAttribute('aria-label', `Copiar el prompt y abrir ${ai.name}`);
+      li.append(num, body, open);
+      el.recList.append(li);
+    });
+    el.recOthers.replaceChildren();
+    groups.forEach(({ why, ias }) => {
+      const g = document.createElement('div'); g.className = 'rec-group';
+      const r = document.createElement('p'); r.className = 'rec-reason'; r.textContent = why;
+      const list = document.createElement('div'); list.className = 'ia-list';
+      ias.forEach(ai => list.append(makeAiLink(ai, ai.name)));
+      g.append(r, list);
+      el.recOthers.append(g);
+    });
+    el.recMore.open = false;
+    el.recNote.textContent = `Recomendaciones orientativas, según el criterio editorial de Promptiful (revisado en ${AI_CATALOG.revisado}). Las capacidades y los planes de cada IA cambian con frecuencia: compruébalo en su web.`;
   }
 
   // ---- Modales informativos (Esc los cierra de serie al ser un <dialog>)
@@ -711,12 +823,12 @@
   }
 
   // --- Guardar el prompt actual
-  async function saveCurrent(tipo) {
+  async function saveCurrent(tipo, fuentes = false) {
     if (!currentRequest) return;
     const prompt = el.output.value;
     if (currentId) { await mutate({ action: 'update', id: currentId, prompt, messages }); return; }
     const myGen = gen;
-    const j = await mutate({ action: 'add', request: currentRequest, prompt, type: tipo || 'otro', messages });
+    const j = await mutate({ action: 'add', request: currentRequest, prompt, type: tipo || 'otro', fuentes, messages });
     if (j && j.id && myGen === gen) currentId = j.id;
   }
   // Las ediciones que haga el usuario en el textarea también se guardan
@@ -742,7 +854,7 @@
     document.body.classList.add('has-output');
     el.output.value = item.prompt;
     show(el.rPanel, true);
-    buildAiLinks(item.type);
+    buildAiLinks(item.type, !!item.fuentes);
     hideSuggest();
     if (mqMobile.matches) setSidebar(false);
     el.rPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
