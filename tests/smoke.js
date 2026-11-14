@@ -22,17 +22,18 @@ async function fakeFetch(url, opts = {}) {
   if (url === 'api.php') {
     apiCalls.push(body);
     const last = body.messages[body.messages.length - 1].content;
-    if (!body.force_final && body.messages.length === 1) {
+    const wantsNews = /noticias/i.test(body.messages[0].content);
+    if (!body.force_final && body.messages.length === 1 && !wantsNews) {
       return json({ ok: true, raw: '{"type":"questions"}', data: { type: 'questions', intro: 'Dime más', questions: [{ apartado: 'tema', pregunta: '¿Qué artista?' }, '¿Dónde?'] } });
     }
-    const prompt = { tipo_salida: 'imagen', rol: 'R', contexto: 'C', tema: 'T', formato: 'F', tono: 'To', ejemplo: 'E', restricciones: 'Re', indicadores_exito: 'I', orden_final: 'Genera la imagen' };
+    const prompt = { tipo_salida: wantsNews ? 'texto' : 'imagen', necesita_fuentes: wantsNews, rol: 'R', contexto: 'C', tema: 'T', formato: 'F', tono: 'To', ejemplo: 'E', restricciones: 'Re', indicadores_exito: 'I', orden_final: 'Genera la imagen' };
     return json({ ok: true, raw: JSON.stringify({ type: 'final', prompt }), data: { type: 'final', prompt } });
   }
   if (url === 'history.php') {
     if (!body) return json({ ok: true, items: sorted() });
     const now = Math.floor(Date.now() / 1000) + (++idc);
     switch (body.action) {
-      case 'add': { const it = { id: 'id' + idc, title: body.request.slice(0, 60), request: body.request, prompt: body.prompt, type: body.type, fav: false, created: now, updated: now, messages: body.messages }; store.unshift(it); return json({ ok: true, items: sorted(), id: it.id }); }
+      case 'add': { const it = { id: 'id' + idc, title: body.request.slice(0, 60), request: body.request, prompt: body.prompt, type: body.type, fuentes: !!body.fuentes, fav: false, created: now, updated: now, messages: body.messages }; store.unshift(it); return json({ ok: true, items: sorted(), id: it.id }); }
       case 'update': { const it = store.find(x => x.id === body.id); if (body.title) it.title = body.title; if ('fav' in body) it.fav = body.fav; if (body.prompt) { it.prompt = body.prompt; it.updated = now; } if (body.messages) it.messages = body.messages; return json({ ok: true, items: sorted() }); }
       case 'get': return json({ ok: true, items: sorted(), item: store.find(x => x.id === body.id) });
       case 'delete': store = store.filter(x => x.id !== body.id); return json({ ok: true, items: sorted() });
@@ -81,6 +82,18 @@ async function fakeFetch(url, opts = {}) {
   const sent = apiCalls[apiCalls.length - 1].messages.slice(-1)[0].content;
   ok(sent.includes('1. [Tema] ¿Qué artista?') && sent.includes('2. ¿Dónde?'), 'las respuestas enviadas a la IA incluyen el apartado entre corchetes');
   ok(!$('resultPanel').hidden && $('output').value.includes('## Rol'), 'se muestra el prompt final');
+  const names = () => [...d.querySelectorAll('.rec-item strong')].map(x => x.textContent);
+  ok(JSON.stringify(names()) === JSON.stringify(['ChatGPT', 'Gemini', 'Copilot']), 'imagen: el podio es ChatGPT, Gemini y Copilot');
+  ok(d.querySelectorAll('.rec-star').length === 1 && d.querySelector('.rec-item .rec-star').textContent === 'Recomendada', 'solo la primera lleva la etiqueta "Recomendada"');
+  ok(d.querySelectorAll('.rec-open').length === 3 && d.querySelector('.rec-item p').textContent.startsWith('Genera imágenes de forma nativa'), '3 tarjetas con botón Abrir y motivo de imagen');
+  const groups = [...d.querySelectorAll('.rec-group')].map(g => ({ why: g.querySelector('.rec-reason').textContent, ias: [...g.querySelectorAll('a')].map(a => a.textContent) }));
+  const noImg = groups.find(g => g.why.startsWith('No genera imágenes'));
+  ok(noImg && noImg.ias.length === 2 && noImg.ias.includes('Claude') && noImg.ias.includes('DeepSeek'), 'Claude y DeepSeek agrupados: no generan imágenes');
+  ok(groups.some(g => g.ias.includes('Perplexity') && g.why.includes('buscar y citar fuentes')), 'Perplexity con su motivo específico');
+  ok(!d.getElementById('recMore').open && d.getElementById('recNote').textContent.includes('noviembre de 2026'), 'las otras opciones van plegadas y se muestra la fecha de revisión');
+  const open0 = d.querySelector('.rec-open');
+  open0.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
+  ok(open0.href.startsWith('https://chatgpt.com/?q='), 'el botón Abrir prepara el enlace con el prompt (ChatGPT admite ?q=)');
   ok(store.length === 1 && store[0].type === 'imagen' && store[0].messages.length >= 4, 'se guardó UNA entrada con tipo y mensajes');
 
   // 2) Editar el textarea se guarda (debounce 900 ms)
@@ -136,6 +149,19 @@ async function fakeFetch(url, opts = {}) {
   $('sideToggle').click(); await wait(40);
   d.querySelectorAll('.h-actions .icon-btn')[3].click(); await wait(40);
   ok(store.length === 0 && d.querySelector('.h-empty'), 'borrar entrada');
+  // 8) Texto que necesita fuentes: Perplexity pasa a ser la recomendada y el dato se guarda
+  $('brandLink').click(); await wait(10);
+  $('basicPrompt').value = 'Resumen de noticias del sector';
+  $('btnImprove').click(); await wait(80);
+  ok(!$('resultPanel').hidden, 'petición con noticias: llega el resultado');
+  ok(JSON.stringify(names()) === JSON.stringify(['Perplexity', 'ChatGPT', 'Claude']), 'texto + fuentes: podio Perplexity, ChatGPT y Claude');
+  ok(d.querySelector('.rec-item p').textContent.startsWith('Busca en la web y cita sus fuentes'), 'motivo de Perplexity: busca y cita fuentes');
+  ok(store.length === 1 && store[0].fuentes === true && store[0].type === 'texto', 'se guarda que el prompt necesita fuentes');
+  // reabrirlo desde los recientes mantiene la recomendación
+  $('brandLink').click(); await wait(10);
+  $('basicPrompt').dispatchEvent(new w.Event('click')); await wait(10);
+  $('suggest').children[0].dispatchEvent(new w.MouseEvent('mousedown', { bubbles: true, cancelable: true })); await wait(60);
+  ok(JSON.stringify(names()) === JSON.stringify(['Perplexity', 'ChatGPT', 'Claude']), 'al reabrir desde el historial se mantiene la recomendación');
   console.log(process.exitCode ? '\nHAY FALLOS' : '\nTODO OK');
   process.exit();
 })().catch(e => { console.error('EXCEPCIÓN', e); process.exit(1); });

@@ -134,6 +134,7 @@ $file = rtrim($dir, '/\\') . '/' . $vid . '.json';
                 'prompt'   => $prompt,
                 'type'     => in_array($type, $types, true) ? $type : 'otro',
                 'fav'      => false,
+                'fuentes'  => !empty($input['fuentes']),
                 'created'  => $now,
                 'updated'  => $now,
                 'messages' => clean_messages($input['messages'] ?? [], $maxMsgs, $maxChars),
