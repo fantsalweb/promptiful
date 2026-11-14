@@ -1,0 +1,4 @@
+# Bloquea el acceso directo a la configuración (Apache)
+<Files "config.php">
+    Require all denied
+</Files>

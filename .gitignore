@@ -1,0 +1,14 @@
+# Configuración real (contiene la API key): usa admin/config.example.php como plantilla
+admin/config.php
+
+# Historiales guardados por los visitantes (datos de usuarios)
+admin/data/history/
+
+# Node (solo para los tests)
+node_modules/
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
