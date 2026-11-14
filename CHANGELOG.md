@@ -1,6 +1,6 @@
 # Historial de cambios
 
-Este repositorio empieza con **un único commit inicial** que contiene el proyecto en su estado actual. Aquí se resume cómo se llegó hasta él. Es una crónica escrita a posteriori, por hitos y sin fechas, no un registro de versiones publicadas.
+El proyecto se subió en **un único commit** con su estado actual, precedido solo por el commit de GitHub con la licencia. Aquí se resume cómo se llegó hasta él. Es una crónica escrita a posteriori, por hitos y sin fechas, no un registro de versiones publicadas.
 
 ## Hito 1 · Prototipo inicial (entonces «Promptfull»)
 
