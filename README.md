@@ -129,8 +129,8 @@ npm test
 
 ## Sobre el desarrollo
 
-Proyecto desarrollado de forma iterativa con ayuda de un asistente de IA (Claude, de Anthropic). El repositorio parte de un único commit inicial; la evolución real está resumida en [CHANGELOG.md](CHANGELOG.md).
+Proyecto desarrollado de forma iterativa con ayuda de un asistente de IA (Claude, de Anthropic). El historial contiene el commit inicial de GitHub (LICENSE) y un commit con el proyecto en su estado actual; la evolución real está resumida en [CHANGELOG.md](CHANGELOG.md).
 
 ## Licencia
 
-Todavía sin definir. Sin una licencia explícita, el código no se puede reutilizar legalmente.
+Consulta el archivo LICENSE.
