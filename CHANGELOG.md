@@ -1,6 +1,6 @@
 # Historial de cambios
 
-El proyecto se subió en **un único commit** con su estado de entonces, precedido solo por el commit de GitHub con la licencia. Los hitos 1 a 9 resumen cómo se llegó hasta ahí; es una crónica escrita a posteriori, por hitos y sin fechas, no un registro de versiones publicadas. A partir del hito 10, cada cambio llega en su propia rama y commit.
+El proyecto se subió en **un único commit** con su estado de entonces, precedido solo por el commit de GitHub con la licencia. Los hitos 1 a 9 resumen cómo se llegó hasta ahí; son una crónica escrita a posteriori, por hitos y sin fechas, no un registro de versiones publicadas. A partir del hito 10, cada cambio llega en su propia rama y commit.
 
 ## Hito 1 · Prototipo inicial (entonces «Promptfull»)
 
