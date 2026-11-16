@@ -2,135 +2,161 @@
 
 Promptiful convierte una idea sencilla («créame un post para mi blog sobre viajes por América») en un **prompt profesional** listo para pegar en ChatGPT, Claude, Gemini o cualquier otra IA. Está pensado para personas que no saben de *prompt engineering*: escriben lo que quieren, responden unas pocas preguntas y reciben un prompt bien estructurado que pueden editar y copiar.
 
-La interfaz imita la portada de un buscador (logo con letras de colores y una barra centrada), y los prompts se generan con la API de DeepSeek a través de un pequeño proxy en PHP que oculta la API key.
+La interfaz imita la portada de un buscador (logo con letras de colores y una barra centrada). Los prompts se generan con la API de DeepSeek a través de un backend en **CodeIgniter 4** que oculta la API key y controla el uso.
 
-> **Estado:** prototipo / demo en desarrollo. No hay cuentas de usuario, ni cobros, ni tope de gasto. Lee [Estado y limitaciones](#estado-y-limitaciones) antes de exponerlo públicamente.
+> **Estado:** prototipo en desarrollo. Esta es la *fase 1* de la migración a CodeIgniter 4: misma funcionalidad que la versión en PHP simple, con prueba gratuita limitada e historial en base de datos. Todavía **no hay cuentas de usuario, panel de administración ni cobros**. Lee [Estado y limitaciones](#estado-y-limitaciones) antes de exponerlo públicamente.
 
 ## Características
 
-- **Preguntas dinámicas.** La IA decide qué falta en tu idea y hace de 2 a 5 preguntas cortas (máximo 2 rondas). Cada pregunta lleva un *badge* con el apartado del prompt al que va dirigida (Rol, Contexto, Tema…).
-- **Prompt estructurado en 9 apartados:** Rol, Contexto, Tema, Formato, Tono, Ejemplo, Restricciones, Indicadores de éxito e Instrucción de ejecución. Se muestra en un cuadro de texto editable.
-- **Detección del tipo de salida** (imagen, texto, código, datos, otro). La *Instrucción de ejecución* fija qué debe entregar la IA (por ejemplo, ordena **generar** la imagen en lugar de describirla).
-- **Enlaces a IAs:** ChatGPT, Claude, Perplexity, Copilot, Grok, Gemini, DeepSeek y Mistral. El prompt se copia al portapapeles y, donde existe un parámetro de URL no oficial (`?q=`), se abre ya escrito. Para prompts de imagen se priorizan las IAs que suelen generar imágenes.
-- **Historial sin cuentas.** Cada navegador recibe un identificador aleatorio y su historial se guarda en un JSON propio en el servidor: búsqueda, favoritos, renombrar, copiar y borrar. Se ofrece en una barra lateral plegable y como lista de recientes bajo la barra de entrada.
-- **Landing page** explicativa, modales de ayuda («Sobre Promptiful» y «Prompt engineering»), modo oscuro y diseño adaptable a móvil.
+- **Preguntas dinámicas.** La IA decide qué falta en tu idea y hace de 2 a 5 preguntas cortas (máximo 2 rondas, también aplicado en el servidor). Cada pregunta lleva un *badge* con el apartado del prompt al que va dirigida.
+- **Prompt de 9 apartados:** Rol, Contexto, Tema, Formato, Tono, Ejemplo, Restricciones, Indicadores de éxito e Instrucción de ejecución, en un cuadro de texto editable.
+- **Tipo de salida** (imagen, texto, código, datos, otro) e **instrucción de ejecución**: el prompt termina con una orden explícita de entrega (por ejemplo, *generar* la imagen en lugar de describirla).
+- **Recomendador de IA.** Ordena ChatGPT, Claude, Perplexity, Copilot, Grok, Gemini, DeepSeek y Mistral según el tipo de prompt, con podio de tres, motivo de cada una y las demás plegadas. El orden sale de reglas sobre un catálogo editable (`AI_CATALOG` en `app/Views/tool.php`), no del modelo. El prompt se copia al portapapeles y, donde existe un parámetro de URL no oficial (`?q=`), se abre ya escrito.
+- **Prueba gratuita sin registro:** 3 consultas **en total** por navegador (cookie), con un tope más holgado por IP (10) para no castigar a redes compartidas. El contador caduca a los 30 días. Una *consulta* es un prompt final generado: las rondas de preguntas no cuentan y regenerar sí.
+- **Historial anónimo en base de datos**, ligado a la cookie del navegador: hasta 5 prompts (los favoritos no se descartan), búsqueda, favoritos, renombrar, copiar y borrar.
+- **Control de abuso y de coste:** límite de peticiones por visitante, tope global diario de gasto (opcional) y registro de los tokens de cada llamada.
+- Landing page, modales de ayuda, modo oscuro y diseño adaptable a móvil.
 
 ## Cómo funciona
 
-```
-Navegador (admin/index.html)
-   │  POST {messages, force_final}            (el historial de la conversación viaja completo)
-   ▼
-admin/api.php ── añade el prompt de sistema ──► API de DeepSeek (modo JSON)
-   │  valida y normaliza la respuesta
-   ▼
-{type: "questions", questions: [{apartado, pregunta}]}   o   {type: "final", prompt: {...9 apartados}}
+| Ruta | Qué hace |
+|---|---|
+| `GET /` | Landing page |
+| `GET /app` | La herramienta (recibe las rutas de la API, el token CSRF y el estado de la prueba) |
+| `POST /api/generate` | Conversación con DeepSeek: devuelve preguntas o el prompt final |
+| `GET /api/history`, `POST /api/history` | Historial del navegador (`add`, `get`, `update`, `delete`, `clear`) |
 
-Navegador ◄──► admin/history.php ◄──► admin/data/history/<id-del-navegador>.json
 ```
+Api\Generate:  CSRF → límite de peticiones → cuota de prueba → tope de gasto
+               → llamada a DeepSeek → validación del JSON → registro de tokens
+```
+
+- **La API de DeepSeek no tiene memoria**, así que el navegador guarda la conversación y la reenvía completa. El servidor la valida y le antepone el prompt de sistema.
+- **Contrato JSON** entre el modelo y la interfaz: `questions` (con `apartado` y `pregunta`) o `final` (con los 9 apartados, `tipo_salida` y `necesita_fuentes`). Lo que no cumple el contrato se descarta.
 
 ## Estructura
 
 ```
-.
-├── index.html                 Landing page
-├── admin/                     La herramienta
-│   ├── index.html             Interfaz (HTML + CSS + JS, sin dependencias)
-│   ├── api.php                Proxy a DeepSeek (oculta la API key)
-│   ├── history.php            Historial por navegador (JSON)
-│   ├── config.example.php     Plantilla de configuración → copiar a config.php
-│   ├── .htaccess              Bloquea el acceso directo a config.php (Apache)
-│   └── data/.htaccess         Bloquea el acceso a los historiales (Apache)
-├── tests/smoke.js             Prueba de humo del frontend (jsdom)
-└── CHANGELOG.md               Crónica de cómo ha evolucionado el proyecto
+app/
+├── Config/Promptiful.php         Ajustes de Promptiful (se sobrescriben desde .env)
+├── Controllers/
+│   ├── Home.php                  Landing y herramienta
+│   └── Api/{Generate,History}.php
+├── Libraries/                    PromptRules (prompt de sistema + validación), DeepSeekClient,
+│                                 Visitor (cookie + IP hasheada), TrialQuota
+├── Models/                       HistoryModel, TrialUsageModel, ApiCallModel
+├── Database/Migrations/          trial_usage, api_calls, history_entries
+└── Views/                        landing.php, tool.php
+tests/e2e/                        Prueba de extremo a extremo (DeepSeek simulado + jsdom)
+env                               Plantilla de configuración → copiar a .env
 ```
 
 ## Requisitos
 
-- PHP 8.0 o superior con las extensiones `curl` y `mbstring`.
+- PHP 8.2 o superior con `intl`, `mbstring` y `curl`; y `mysqli` (producción) o `sqlite3` (pruebas).
+- [Composer](https://getcomposer.org/).
+- MySQL o MariaDB en producción.
 - Una API key de DeepSeek.
-- Apache si quieres usar los `.htaccess` incluidos (si usas otro servidor, protege tú esos archivos o muévelos fuera de la carpeta pública).
+- Node 20+ solo para las pruebas.
 
 ## Instalación
 
 ```bash
 git clone <url-del-repositorio> promptiful
 cd promptiful
-cp admin/config.example.php admin/config.php   # y escribe tu API key en 'api_key'
-php -S localhost:8000                          # servidor de desarrollo
+composer install
+cp env .env          # en Windows: copy env .env
+# edita .env: app.baseURL, la base de datos y promptiful.deepseekApiKey
+php spark migrate
+php spark serve
 ```
 
-Abre `http://localhost:8000/` (landing) y `http://localhost:8000/admin/` (herramienta). El servidor integrado de PHP ignora los `.htaccess`; en un servidor real revisa la sección de seguridad.
+Abre `http://localhost:8080/` (landing) y `http://localhost:8080/app` (herramienta). Para probar sin MySQL, en `.env` usa `database.default.DBDriver = SQLite3` y `database.default.database = promptiful.sqlite`.
 
-## Configuración (`admin/config.php`)
+## Configuración
+
+Todo se ajusta en `.env` con el prefijo `promptiful.` (los valores por defecto están en `app/Config/Promptiful.php`).
 
 | Clave | Por defecto | Descripción |
 |---|---|---|
-| `api_key` | — | API key de DeepSeek. **Nunca la subas al repositorio** (`config.php` está en el `.gitignore`). |
-| `api_url` | `https://api.deepseek.com/chat/completions` | Endpoint compatible con el formato de chat completions. |
-| `model` | `deepseek-chat` | Modelo a usar. |
-| `temperature` | `0.7` | Más baja = preguntas y prompts más estables. |
-| `max_tokens` | `2000` | Límite de salida por llamada. |
-| `rate_limit_requests` / `rate_limit_window` | `20` / `600` | Peticiones permitidas por sesión de navegador en esa ventana (segundos). |
-| `max_messages` / `max_chars_message` | `20` / `12000` | Límites del historial de conversación que acepta `api.php`. |
-| `history_dir` | `admin/data/history` | Dónde se guardan los historiales. En producción, mejor **fuera** de la carpeta pública. |
-| `history_max_items` | `50` | Prompts guardados por navegador (los favoritos no se descartan). |
+| `deepseekApiKey` | — | API key de DeepSeek. Nunca la subas al repositorio. |
+| `deepseekApiUrl` / `deepseekModel` | `https://api.deepseek.com/chat/completions` / `deepseek-chat` | Endpoint compatible con chat completions y modelo. |
+| `temperature` / `maxTokens` | `0.7` / `2000` | Más baja = preguntas y prompts más estables. |
+| `maxMessages` / `maxCharsMessage` | `20` / `12000` | Límites de la conversación que acepta el servidor. |
+| `maxQuestionRounds` | `2` | Rondas de preguntas antes de forzar el prompt final. |
+| `rateLimitRequests` / `rateLimitWindow` | `20` / `600` | Peticiones permitidas por visitante en esa ventana (segundos). |
+| `trialPerVisitor` / `trialPerIp` | `3` / `10` | Consultas de prueba por navegador y por IP. |
+| `trialWindowDays` | `30` | A los cuántos días caduca el contador de la prueba. |
+| `anonHistoryMax` | `5` | Prompts guardados por navegador anónimo. |
+| `dailyBudgetEur` | `0` | Tope global diario en euros (0 = desactivado). |
+| `priceInputPer1M` / `priceOutputPer1M` | `0` / `0` | Precio por millón de tokens de entrada y salida: **ponlos tú** con el precio vigente; sin ellos el coste estimado es 0 y el tope no se activa. |
+| `ipSalt` | derivada | Sal para guardar la IP solo como hash. Pon una aleatoria. |
+
+## Despliegue
+
+- Apunta el servidor web a la carpeta `public/` (por ejemplo, un subdominio). Es lo que recomienda CodeIgniter: así `app/`, `vendor/` y `.env` quedan fuera de la web.
+- En `.env`: `CI_ENVIRONMENT = production`, `app.baseURL` con la URL pública y barra final, `cookie.secure = true` si usas HTTPS y los datos de MySQL.
+- `php spark migrate` crea las tablas. `writable/` debe ser escribible por el servidor (caché, logs).
+- Detrás de un proxy o CDN, configura `app.proxyIPs` para que la IP del visitante sea la real; si no, el límite por IP agrupará a todos los visitantes.
+- Si no puedes cambiar el *document root*, se puede publicar el contenido de `public/` en la carpeta web y mover el resto fuera de ella, ajustando la ruta a `Paths.php` en `public/index.php`. Esa variante no está probada aquí.
 
 ## Seguridad y privacidad
 
 **Implementado**
 
-- La API key solo existe en el servidor; el navegador nunca la ve.
-- El cliente no puede inyectar mensajes `system`; el servidor valida roles, longitudes y la estructura del JSON que devuelve el modelo.
-- Límite de peticiones por sesión en `api.php`; los errores de PHP van al log y no a la respuesta.
-- Historial: identificador aleatorio de 128 bits en una cookie `HttpOnly` y `SameSite=Lax`, validado con una expresión regular antes de tocar el sistema de archivos; escritura con bloqueo de archivo; solo acepta JSON y comprueba el `Origin`; límites de tamaño.
+- La API key solo existe en el servidor. `.env` está en el `.gitignore`.
+- Protección CSRF de CodeIgniter en todas las peticiones POST (el token llega en una cabecera y dura 24 h; pasado ese tiempo hay que recargar la página).
+- El cliente no puede inyectar mensajes `system`; el servidor valida roles, longitudes, número de mensajes y la estructura del JSON del modelo.
+- Límite de peticiones por visitante (throttler de CodeIgniter), tope de rondas de preguntas también en el servidor y tope global de gasto diario opcional.
+- Identificación anónima con una cookie `HttpOnly` y `SameSite=Lax` de 128 bits aleatorios. **La IP se guarda solo como hash** (HMAC con sal), nunca en claro.
+- El historial de un navegador solo es accesible con su cookie; las consultas a base de datos usan el constructor de consultas de CodeIgniter.
 - La interfaz inserta el contenido del usuario o de la IA con `textContent`; `innerHTML` solo se usa con iconos SVG constantes.
 
 **No implementado todavía**
 
-- CAPTCHA, límite por IP, tope global de gasto diario y registro de tokens consumidos. El límite actual es **por sesión**: un script que no guarde cookies lo esquiva. Si lo expones, fija un saldo limitado en tu cuenta del proveedor.
-- Cuentas de usuario y cobros.
-- Cifrado de los historiales: se guardan como JSON en texto plano en el servidor.
-- Protección de `data/` y `config.php` en servidores que no sean Apache (usa `history_dir` fuera de la web y mueve `config.php`).
+- CAPTCHA, cuentas de usuario, panel de administración y cobros.
+- Cifrado de los historiales: se guardan en texto plano en la base de datos.
+- Política de privacidad, términos de uso y aviso de cookies (necesarios antes de abrirlo al público).
+- Una prueba gratuita por IP puede esquivarse con una VPN; el tope global de gasto limita el daño, no lo impide.
 
-**Privacidad:** los textos que escribe el usuario se envían a la API de DeepSeek. Conviene avisarlo en tu política de privacidad y no introducir datos personales o confidenciales.
+**Privacidad:** los textos del usuario se envían a la API de DeepSeek. Hay que avisarlo en la política de privacidad y recomendar no introducir datos personales o confidenciales.
 
 ## Decisiones técnicas
 
-- **La API no tiene memoria entre llamadas**, así que el cliente guarda la conversación completa y la reenvía en cada petición. El servidor la valida y le antepone el prompt de sistema.
-- **Contrato JSON explícito** entre el modelo y la interfaz (`questions` / `final`), con modo JSON en la API y validación en el servidor. Si el modelo devuelve algo inesperado, se descarta con un error claro.
-- **Tipo de salida + instrucción de ejecución.** Surgió de un fallo real: con «Hazme un cartel para un concierto» el prompt generado producía una descripción del diseño en vez de la imagen. Ahora el prompt termina con una orden explícita de entrega.
-- **Historial por navegador en JSON** en lugar de una base de datos: sin instalación y fácil de migrar a cuentas más adelante. A cambio, depende de una cookie.
-- **Sin frameworks ni dependencias** en el frontend ni en el backend.
+- **CodeIgniter 4 en lugar de PHP simple.** Con cuentas, cuotas y un panel de administración en el horizonte, conviene apoyarse en un framework para lo delicado (CSRF, validación, migraciones, sesiones, límites de peticiones).
+- **Una «consulta» es un prompt final generado.** Las rondas de preguntas no cuentan; regenerar sí, porque cuesta una llamada de salida larga.
+- **El recomendador de IA lo deciden reglas, no el modelo.** DeepSeek solo indica el tipo de salida y si el prompt necesita fuentes; el orden sale de un catálogo propio con fecha de revisión visible.
+- **Tipo de salida + instrucción de ejecución.** Surgió de un fallo real: con «Hazme un cartel para un concierto» el prompt producía una descripción del diseño en vez de la imagen.
+- **Registro de cada llamada** (tokens y coste estimado): es la base del control de coste y de las futuras métricas.
 
 ## Pruebas
 
 ```bash
 npm install
-npm test
+npm run test:e2e      # necesita PHP en el PATH (o PHP_BIN=ruta/a/php) y `composer install` hecho
 ```
 
-`tests/smoke.js` carga `admin/index.html` en jsdom y simula en memoria las respuestas de `api.php` y `history.php`: comprueba el flujo de preguntas, los badges, el resultado, el guardado y la edición, el historial, la barra lateral y los recientes. **No hay pruebas automatizadas del backend PHP.**
+La prueba arranca un DeepSeek simulado y la aplicación real con SQLite, abre la herramienta en jsdom y la maneja como una persona. Comprueba, entre otras cosas: el flujo de preguntas y prompt final, los badges, el recomendador, el consumo de la prueba (3 consultas y bloqueo a la cuarta), el historial persistente y aislado por navegador, el rechazo sin token CSRF y el manejo de respuestas inválidas de la IA. Para no tocar tu configuración, usa un `.env` temporal y restaura el tuyo al terminar.
 
 ## Estado y limitaciones
 
-- Es una demo. `api.php` se ha probado manualmente con la API real de DeepSeek; `history.php` solo tiene la revisión de código y la simulación del frontend.
-- La calidad de las preguntas y de los prompts depende del modelo y puede variar entre ejecuciones.
-- La lista de IAs que generan imágenes (`AIS` en `admin/index.html`) y el parámetro `?q=` de cada web no son oficiales y pueden quedar desactualizados.
-- La accesibilidad se ha cuidado (etiquetas, foco visible, enlace «Saltar al contenido» en la landing), pero no se ha auditado.
-- No se han hecho comprobaciones visuales automatizadas ni pruebas en varios navegadores.
+- La prueba de extremo a extremo y las pruebas manuales se han hecho con **SQLite**. Las migraciones y las consultas no se han ejecutado contra MySQL en este entorno.
+- No hay pruebas unitarias con PHPUnit ni pruebas visuales automatizadas ni en varios navegadores.
+- La llamada real a la API de DeepSeek no está cubierta por las pruebas (se simula); su comportamiento depende del modelo y puede variar entre ejecuciones.
+- El catálogo de IAs (capacidades verificables y *afinidades* editoriales) es orientativo, y los parámetros `?q=` de cada web no son oficiales: conviene revisarlos periódicamente.
+- Los historiales guardados con la versión anterior (ficheros JSON) no se migran.
 
-## Ideas en estudio (no son compromisos)
+## Hoja de ruta
 
-- Varias piezas a partir de un único briefing (p. ej. Instagram, WhatsApp y email) sin repetir preguntas.
-- Proyectos o perfiles de marca guardados y plantillas por sector.
-- Recomendador de IA según el tipo de prompt, con una tabla de capacidades fechada y reglas, no decidido por el propio modelo.
-- Cuentas, cuotas, tope diario de gasto y suscripción.
+1. **Fase 1 (esta):** migración a CodeIgniter 4, prueba gratuita de 3 consultas e historial anónimo.
+2. **Fase 2:** registro con verificación de email, 20 consultas al mes, historial de 10 en base de datos e importación del historial anónimo.
+3. **Fase 3:** panel de superadministrador con usuarios y métricas (embudo, uso, coste, abuso).
+4. **Más adelante, solo si hay demanda:** plan de pago.
 
 ## Sobre el desarrollo
 
-Proyecto desarrollado de forma iterativa con ayuda de un asistente de IA (Claude, de Anthropic). El historial contiene el commit inicial de GitHub (LICENSE) y un commit con el proyecto en su estado actual; la evolución real está resumida en [CHANGELOG.md](CHANGELOG.md).
+Proyecto desarrollado de forma iterativa con ayuda de un asistente de IA (Claude, de Anthropic). La evolución está resumida en [CHANGELOG.md](CHANGELOG.md).
 
 ## Licencia
 
-Consulta el archivo LICENSE.
+Consulta el archivo [LICENSE](LICENSE).

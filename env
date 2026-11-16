@@ -1,0 +1,43 @@
+#--------------------------------------------------------------------
+# Promptiful: copia este archivo como `.env` y ajusta los valores.
+# El archivo `.env` NO se sube al repositorio (contiene secretos).
+#--------------------------------------------------------------------
+
+# development en local; production en el servidor real
+CI_ENVIRONMENT = development
+
+# URL pública de la aplicación, con barra final
+app.baseURL = 'http://localhost:8080/'
+
+# Base de datos (producción: MySQL/MariaDB)
+database.default.hostname = localhost
+database.default.database = promptiful
+database.default.username = root
+database.default.password =
+database.default.DBDriver = MySQLi
+database.default.port = 3306
+
+# Para probar sin MySQL: DBDriver = SQLite3 y database = promptiful.sqlite (se guarda en writable/)
+
+# Activa esta línea cuando se sirva por HTTPS
+# cookie.secure = true
+
+#--------------------------------------------------------------------
+# Promptiful
+#--------------------------------------------------------------------
+# API key de DeepSeek
+promptiful.deepseekApiKey = 
+
+# Sal para guardar la IP solo como hash. Genera una con: php -r "echo bin2hex(random_bytes(16));"
+promptiful.ipSalt = 
+
+# Opcionales (valores por defecto entre paréntesis):
+# promptiful.deepseekModel = deepseek-chat
+# promptiful.temperature = 0.7
+# promptiful.trialPerVisitor = 3
+# promptiful.trialPerIp = 10
+# promptiful.trialWindowDays = 30
+# promptiful.anonHistoryMax = 5
+# promptiful.dailyBudgetEur = 0
+# promptiful.priceInputPer1M = 0
+# promptiful.priceOutputPer1M = 0

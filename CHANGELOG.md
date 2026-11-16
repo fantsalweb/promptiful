@@ -1,6 +1,6 @@
 # Historial de cambios
 
-El proyecto se subió en **un único commit** con su estado actual, precedido solo por el commit de GitHub con la licencia. Aquí se resume cómo se llegó hasta él. Es una crónica escrita a posteriori, por hitos y sin fechas, no un registro de versiones publicadas.
+El proyecto se subió en **un único commit** con su estado de entonces, precedido solo por el commit de GitHub con la licencia. Los hitos 1 a 9 resumen cómo se llegó hasta ahí; es una crónica escrita a posteriori, por hitos y sin fechas, no un registro de versiones publicadas. A partir del hito 10, cada cambio llega en su propia rama y commit.
 
 ## Hito 1 · Prototipo inicial (entonces «Promptfull»)
 
@@ -57,3 +57,25 @@ El proyecto se subió en **un único commit** con su estado actual, precedido so
 
 - `config.php` pasa a ser `config.example.php`; la configuración real queda fuera del control de versiones.
 - `.gitignore`, README y una prueba de humo del frontend con jsdom.
+
+## Hito 10 · Recomendador de IA
+
+- La API devuelve `necesita_fuentes` junto al tipo de salida, sin llamadas adicionales.
+- Podio de tres IAs con su motivo y el resto plegado con motivos agrupados. El orden sale de reglas sobre un catálogo (`AI_CATALOG`), no del modelo.
+- Las capacidades verificables (generación de imágenes, búsqueda) se comprobaron con fuentes públicas; las afinidades por tipo de prompt son criterio editorial orientativo.
+- El historial guarda si el prompt necesitaba fuentes, para mantener la recomendación al reabrirlo.
+- La prueba de humo del frontend cubre el recomendador.
+
+## Hito 11 · Migración a CodeIgniter 4 (fase 1)
+
+- El backend en PHP simple se reescribe en CodeIgniter 4.7: controladores (`Home`, `Api\Generate`, `Api\History`), librerías (`PromptRules`, `DeepSeekClient`, `Visitor`, `TrialQuota`), modelos y una migración con tres tablas (`trial_usage`, `api_calls`, `history_entries`).
+- Nuevas rutas: `/` (landing), `/app` (herramienta), `/api/generate` y `/api/history`. La carpeta `admin/` desaparece.
+- Protección CSRF de CodeIgniter en los POST; el frontend envía el token en una cabecera.
+- **Prueba gratuita sin registro:** 3 consultas en total por navegador (cookie), con un tope de 10 por IP y caducidad a los 30 días. La interfaz muestra las consultas restantes y el servidor devuelve un error claro al agotarlas.
+- **Historial anónimo en base de datos** en lugar de ficheros JSON, con un máximo de 5 prompts por navegador (antes 50). Los favoritos no se descartan.
+- El máximo de rondas de preguntas se aplica también en el servidor.
+- Control de coste: se registran los tokens de cada llamada y hay un tope global diario opcional.
+- La IP del visitante se guarda solo como hash con sal.
+- Prueba de extremo a extremo (`npm run test:e2e`): DeepSeek simulado, aplicación real con SQLite y la interfaz manejada con jsdom. Sustituye a la prueba de humo con respuestas simuladas.
+- Se excluyen del esqueleto oficial el workflow de GitHub que cierra pull requests y los tests de ejemplo.
+- Corrección menor: el texto de ayuda de la herramienta todavía decía «Promptfull».

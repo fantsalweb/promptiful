@@ -1,12 +1,1 @@
-{
-  "name": "promptiful",
-  "version": "0.0.0",
-  "private": true,
-  "description": "Pruebas de humo del frontend de Promptiful (el proyecto en sí no necesita Node).",
-  "scripts": {
-    "test": "node tests/smoke.js"
-  },
-  "devDependencies": {
-    "jsdom": "^26.0.0"
-  }
-}
+{"name":"promptiful-e2e","private":true,"scripts":{"test:e2e":"node tests/e2e/run.js"},"devDependencies":{"jsdom":"^26.0.0"}}
