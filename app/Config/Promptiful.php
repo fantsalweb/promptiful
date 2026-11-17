@@ -28,8 +28,8 @@ class Promptiful extends BaseConfig
     public int $rateLimitWindow   = 600;     // segundos
 
     // --- Prueba gratuita sin registro ---
-    public int $trialPerVisitor = 3;         // consultas en total por navegador (cookie)
-    public int $trialPerIp      = 10;        // tope más holgado por IP (redes compartidas)
+    public int $trialPerVisitor = 5;         // consultas en total por navegador (cookie)
+    public int $trialPerIp      = 15;        // tope más holgado por IP (redes compartidas)
     public int $trialWindowDays = 30;        // el contador caduca pasado este tiempo
 
     // --- Historial anónimo ---

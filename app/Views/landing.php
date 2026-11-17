@@ -105,6 +105,21 @@
   .hero h1 { font-size: clamp(36px, 5.5vw, 60px); letter-spacing: -1px; }
   .hl { background: linear-gradient(90deg, var(--blue), var(--red), var(--yellow), var(--green)) no-repeat 0 94% / 100% .14em; padding-bottom: .05em; }
   .lead { font-size: 19px; color: var(--muted); max-width: 34em; margin: 20px 0 28px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .try-box {
+    display: flex; align-items: flex-start; gap: 12px; max-width: 560px; padding: 8px 8px 8px 20px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 28px; box-shadow: var(--shadow);
+  }
+  .try-box:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 25%, transparent); }
+  .try-box textarea {
+    flex: 1; min-height: 24px; max-height: 140px; padding: 8px 0; border: 0; outline: 0; resize: none; background: transparent;
+    color: var(--text); font: 16px/24px Roboto, Arial, sans-serif;
+  }
+  .try-box textarea::placeholder { color: var(--muted); }
+  .try-box textarea:focus-visible { outline: 0; }
+  .try-box textarea:disabled, .try-box .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .try-note { margin: 10px 0 20px 8px; font-size: 14px; color: var(--muted); }
+  .try-note a { color: var(--btn); }
   .cta-row { display: flex; flex-wrap: wrap; gap: 12px; }
   .fineprint { margin: 16px 0 0; font-size: 14px; color: var(--muted); }
 
@@ -238,8 +253,20 @@
         <p class="eyebrow"><span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span>beautiful prompt</p>
         <h1>Convierte una idea sencilla en un prompt <span class="hl">profesional</span></h1>
         <p class="lead">Escribe lo que quieres con tus palabras. Promptiful te hace las preguntas justas y te entrega un prompt completo, listo para ChatGPT, Claude, Gemini y cualquier otra IA.</p>
+        <?php $blocked = $quota['blocked'] || $quota['remaining'] <= 0; ?>
+        <form class="try-box" id="tryForm" action="<?= esc($appUrl, 'attr') ?>" method="get" data-app="<?= esc($appUrl, 'attr') ?>">
+          <label class="sr-only" for="tryInput">Tu idea</label>
+          <textarea id="tryInput" rows="1" maxlength="1500" placeholder="Escribe tu idea, p. ej.: créame un post para mi blog sobre viajes por América"<?= $blocked ? ' disabled' : '' ?>></textarea>
+          <button class="btn btn-primary" type="submit"<?= $blocked ? ' disabled' : '' ?>>Probar</button>
+        </form>
+        <p class="try-note" id="tryNote">
+          <?php if ($blocked): ?>
+            Has usado tus <?= (int) $quota['limit'] ?> pruebas gratuitas. El registro, con más consultas al mes, llegará muy pronto. <a href="<?= esc($appUrl, 'attr') ?>">Abrir la herramienta</a>
+          <?php else: ?>
+            Sin registro: te quedan <?= (int) $quota['remaining'] ?> de <?= (int) $quota['limit'] ?> pruebas gratuitas.
+          <?php endif; ?>
+        </p>
         <div class="cta-row">
-          <a class="btn btn-primary btn-lg" href="<?= esc($appUrl, 'attr') ?>">Probar Promptiful</a>
           <a class="btn btn-ghost btn-lg" href="#como">Ver cómo funciona</a>
         </div>
         <p class="fineprint">No hace falta saber de prompt engineering.</p>
@@ -471,6 +498,25 @@
 
 <script>
   document.getElementById('year').textContent = new Date().getFullYear();
+
+  // Barra de prueba: la idea viaja a la herramienta por sessionStorage (no queda en la URL ni en los logs)
+  (function () {
+    const form = document.getElementById('tryForm');
+    if (!form) return;
+    const input = document.getElementById('tryInput');
+    const grow = () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 140) + 'px'; };
+    input.addEventListener('input', grow);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true })); }
+    });
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const idea = input.value.trim();
+      if (!idea) { input.focus(); return; }
+      try { sessionStorage.setItem('pf_idea', idea); } catch (_) { /* sin almacenamiento: se abre la herramienta vacía */ }
+      window.location.href = form.dataset.app;
+    });
+  })();
 </script>
 </body>
 </html>

@@ -26,16 +26,16 @@ database.default.port = 3306
 # Promptiful
 #--------------------------------------------------------------------
 # API key de DeepSeek
-promptiful.deepseekApiKey = 
+promptiful.deepseekApiKey =
 
 # Sal para guardar la IP solo como hash. Genera una con: php -r "echo bin2hex(random_bytes(16));"
-promptiful.ipSalt = 
+promptiful.ipSalt =
 
 # Opcionales (valores por defecto entre paréntesis):
 # promptiful.deepseekModel = deepseek-chat
 # promptiful.temperature = 0.7
-# promptiful.trialPerVisitor = 3
-# promptiful.trialPerIp = 10
+# promptiful.trialPerVisitor = 5
+# promptiful.trialPerIp = 15
 # promptiful.trialWindowDays = 30
 # promptiful.anonHistoryMax = 5
 # promptiful.dailyBudgetEur = 0

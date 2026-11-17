@@ -1,6 +1,6 @@
 # Historial de cambios
 
-El proyecto se subió en **un único commit** con su estado de entonces, precedido solo por el commit de GitHub con la licencia. Los hitos 1 a 9 resumen cómo se llegó hasta ahí; son una crónica escrita a posteriori, por hitos y sin fechas, no un registro de versiones publicadas. A partir del hito 10, cada cambio llega en su propia rama y commit.
+El proyecto se subió en **un único commit** con su estado de entonces, precedido solo por el commit de GitHub con la licencia. Los hitos 1 a 9 resumen cómo se llegó hasta ahí; es una crónica escrita a posteriori, por hitos y sin fechas, no un registro de versiones publicadas. A partir del hito 10, cada cambio llega en su propia rama y commit.
 
 ## Hito 1 · Prototipo inicial (entonces «Promptfull»)
 
@@ -79,3 +79,11 @@ El proyecto se subió en **un único commit** con su estado de entonces, precedi
 - Prueba de extremo a extremo (`npm run test:e2e`): DeepSeek simulado, aplicación real con SQLite y la interfaz manejada con jsdom. Sustituye a la prueba de humo con respuestas simuladas.
 - Se excluyen del esqueleto oficial el workflow de GitHub que cierra pull requests y los tests de ejemplo.
 - Corrección menor: el texto de ayuda de la herramienta todavía decía «Promptfull».
+
+## Hito 12 · Prueba en la landing y 5 pruebas gratuitas
+
+- La portada tiene una barra de prueba: al escribir una idea y enviarla, la herramienta se abre en `/app` y la lanza sola. La idea pasa por `sessionStorage`, no por la URL.
+- Bajo la barra se muestran las pruebas restantes, calculadas en el servidor. Con la prueba agotada, la barra se desactiva y lo explica.
+- La prueba gratuita sube de 3 a **5 consultas** por navegador en una ventana de 30 días, y el tope por IP de 10 a 15.
+- La prueba de extremo a extremo cubre la barra de la landing y el paso de la idea (32 comprobaciones).
+

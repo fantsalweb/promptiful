@@ -1075,6 +1075,17 @@
     messages.push({ role: 'user', content: 'Genera otra versión distinta y mejorada del prompt final.' });
     callApi(true);
   });
+
+  // Idea enviada desde la landing: se recoge una sola vez y se lanza sola
+  try {
+    const idea = sessionStorage.getItem('pf_idea');
+    if (idea) {
+      sessionStorage.removeItem('pf_idea');
+      el.basic.value = idea.slice(0, 1500);
+      autoGrow();
+      start();
+    }
+  } catch (_) { /* sin almacenamiento: la herramienta se abre vacía */ }
 })();
 </script>
 </body>

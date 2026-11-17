@@ -16,13 +16,14 @@ function makeBrowser(BASE) {
     }
     return res;
   }
-  async function open() {
+  async function open(opts = {}) {
     const resp = await bfetch(BASE + '/app');
     const html = await resp.text();
     if (!html.includes('id="quotaLine"')) throw new Error(`La herramienta no se cargó (HTTP ${resp.status}): ${html.slice(0, 600)}`);
     const dom = new JSDOM(html, {
       url: BASE + '/app', runScripts: 'dangerously', pretendToBeVisual: true,
       beforeParse(win) {
+        if (opts.idea) win.sessionStorage.setItem('pf_idea', opts.idea);
         win.fetch = bfetch;
         win.matchMedia = q => ({ matches: false, media: q, addEventListener() {}, removeListener() {} });
         win.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
@@ -35,7 +36,13 @@ function makeBrowser(BASE) {
     });
     return dom.window;
   }
-  return { open, jar };
+  async function openLanding() {
+    const res = await bfetch(BASE + '/');
+    const html = await res.text();
+    const dom = new JSDOM(html, { url: BASE + '/', runScripts: 'dangerously', pretendToBeVisual: true });
+    return dom.window;
+  }
+  return { open, openLanding, jar };
 }
 
 async function runTests(BASE) {
@@ -52,7 +59,7 @@ async function runTests(BASE) {
   const $ = id => d.getElementById(id);
   const names = () => [...d.querySelectorAll('.rec-item strong')].map(x => x.textContent);
 
-  ok($('quotaLine').textContent === 'Te quedan 3 de 3 consultas de prueba gratuitas.', 'al entrar se muestra la prueba: 3 de 3');
+  ok($('quotaLine').textContent === 'Te quedan 5 de 5 consultas de prueba gratuitas.', 'al entrar se muestra la prueba: 5 de 5');
   ok($('histMax').textContent === '5', 'la nota del historial muestra el máximo (5)');
 
   // 1) Flujo completo: petición -> preguntas -> respuestas -> prompt final
@@ -61,12 +68,12 @@ async function runTests(BASE) {
   ok(await waitFor(() => !$('questionsPanel').hidden), 'aparecen las preguntas');
   const lab0 = d.querySelector('label[for="q0"]');
   ok(lab0.querySelector('.q-badge')?.textContent === 'Tema' && !d.querySelector('label[for="q1"] .q-badge'), 'badge "Tema" en la pregunta 1 y ninguno en la 2');
-  ok($('quotaLine').textContent.includes('3 de 3'), 'las preguntas no gastan consultas');
+  ok($('quotaLine').textContent.includes('5 de 5'), 'las preguntas no gastan consultas');
   $('q0').value = 'PromptFull'; $('btnSendAnswers').click();
   ok(await waitFor(() => !$('resultPanel').hidden), 'se muestra el prompt final');
   ok($('output').value.includes('## Rol') && $('output').value.includes('- a\n- b'), 'el prompt tiene los apartados (y las listas se normalizan)');
   ok(JSON.stringify(names()) === JSON.stringify(['ChatGPT', 'Gemini', 'Copilot']), 'imagen: podio ChatGPT, Gemini y Copilot');
-  ok(await waitFor(() => $('quotaLine').textContent.includes('2 de 3')), 'el prompt final gasta una consulta: quedan 2 de 3');
+  ok(await waitFor(() => $('quotaLine').textContent.includes('4 de 5')), 'el prompt final gasta una consulta: quedan 4 de 5');
 
   // 2) Historial persistente en el servidor
   $('sideToggle').click();
@@ -74,7 +81,7 @@ async function runTests(BASE) {
 
   // 3) Regenerar cuenta como consulta y actualiza la misma entrada
   $('btnRegenerate').click();
-  ok(await waitFor(() => $('quotaLine').textContent.includes('1 de 3')), 'regenerar gasta otra consulta: queda 1 de 3');
+  ok(await waitFor(() => $('quotaLine').textContent.includes('3 de 5')), 'regenerar gasta otra consulta: queda 3 de 5');
   await new Promise(r => setTimeout(r, 300));
   ok(d.querySelectorAll('.h-item').length === 1, 'regenerar no duplica la entrada del historial');
 
@@ -84,20 +91,29 @@ async function runTests(BASE) {
   $('btnImprove').click();
   ok(await waitFor(() => !$('resultPanel').hidden), 'petición con noticias: llega el prompt final');
   ok(JSON.stringify(names()) === JSON.stringify(['Perplexity', 'ChatGPT', 'Claude']), 'texto + fuentes: podio Perplexity, ChatGPT y Claude');
-  ok(await waitFor(() => $('quotaLine').textContent === 'Has agotado tus consultas de prueba gratuitas.'), 'tercera consulta: la prueba queda agotada');
+  ok(await waitFor(() => $('quotaLine').textContent.includes('2 de 5')), 'quedan 2 de 5');
 
-  // 5) Cuarta consulta: el servidor la rechaza
+  // 5) Se agota la prueba (5 consultas) y la sexta se rechaza
+  const quick = async (text, expected) => {
+    $('brandLink').click();
+    $('basicPrompt').value = text;
+    $('btnImprove').click();
+    await waitFor(() => !$('resultPanel').hidden);
+    return waitFor(() => $('quotaLine').textContent === expected);
+  };
+  ok(await quick('noticias de hoy', 'Te quedan 1 de 5 consultas de prueba gratuitas.'), 'cuarta consulta: queda 1 de 5');
+  ok(await quick('noticias de ayer', 'Has agotado tus consultas de prueba gratuitas.'), 'quinta consulta: la prueba queda agotada');
   $('brandLink').click();
   $('basicPrompt').value = 'una más';
   $('btnImprove').click();
-  ok(await waitFor(() => !$('error').hidden), 'la cuarta consulta muestra un error');
+  ok(await waitFor(() => !$('error').hidden), 'la sexta consulta muestra un error');
   ok($('error').textContent.includes('consultas de prueba') && $('resultPanel').hidden, 'el error explica la prueba agotada y no hay resultado');
 
   // 6) Recargar la página conserva el estado (cookie del visitante)
   w = await A.open(); d = w.document;
   ok($('quotaLine').textContent === 'Has agotado tus consultas de prueba gratuitas.', 'tras recargar, la prueba sigue agotada');
   $('sideToggle').click();
-  ok(await waitFor(() => d.querySelectorAll('.h-item').length === 2), 'tras recargar, el historial conserva las 2 entradas');
+  ok(await waitFor(() => d.querySelectorAll('.h-item').length === 4), 'tras recargar, el historial conserva las 4 entradas');
   const fav = d.querySelectorAll('.h-actions .icon-btn')[0];
   fav.click();
   ok(await waitFor(() => d.querySelector('.h-group')?.textContent === 'Favoritos'), 'marcar favorito funciona contra el servidor');
@@ -105,7 +121,7 @@ async function runTests(BASE) {
   // 7) Otro navegador es otro visitante: su propia prueba y su propio historial
   const B = makeBrowser(BASE);
   const wb = await B.open(); const db = wb.document;
-  ok(db.getElementById('quotaLine').textContent === 'Te quedan 3 de 3 consultas de prueba gratuitas.', 'otro navegador tiene su propia prueba de 3 consultas');
+  ok(db.getElementById('quotaLine').textContent === 'Te quedan 5 de 5 consultas de prueba gratuitas.', 'otro navegador tiene su propia prueba de 5 consultas');
   db.getElementById('sideToggle').click();
   ok(await waitFor(() => db.querySelector('.h-empty')), 'otro navegador no ve el historial del primero');
 
@@ -118,7 +134,23 @@ async function runTests(BASE) {
   dc.getElementById('basicPrompt').value = 'respuesta rota';
   dc.getElementById('btnImprove').click();
   ok(await waitFor(() => !dc.getElementById('error').hidden), 'si la IA devuelve algo inválido se muestra un error');
-  ok(dc.getElementById('quotaLine').textContent.includes('3 de 3'), 'y no se descuenta ninguna consulta');
+  ok(dc.getElementById('quotaLine').textContent.includes('5 de 5'), 'y no se descuenta ninguna consulta');
+
+  // 10) Landing: barra de prueba con las pruebas restantes
+  const C = makeBrowser(BASE);
+  const wl = await C.openLanding(); const dl = wl.document;
+  ok(dl.getElementById('tryNote').textContent.replace(/\s+/g, ' ').trim() === 'Sin registro: te quedan 5 de 5 pruebas gratuitas.', 'landing: un visitante nuevo ve «te quedan 5 de 5»');
+  ok(dl.getElementById('tryForm').getAttribute('action').endsWith('/app') && !dl.getElementById('tryInput').disabled, 'landing: la barra está activa y apunta a /app');
+  dl.getElementById('tryInput').value = 'Hazme un cartel desde la landing';
+  dl.getElementById('tryForm').dispatchEvent(new wl.Event('submit', { cancelable: true, bubbles: true }));
+  ok(wl.sessionStorage.getItem('pf_idea') === 'Hazme un cartel desde la landing', 'landing: al enviar, la idea queda en sessionStorage (no en la URL)');
+  const wlA = await A.openLanding();
+  ok(wlA.document.getElementById('tryInput').disabled && wlA.document.getElementById('tryNote').textContent.includes('Has usado tus 5 pruebas gratuitas'), 'landing: con la prueba agotada la barra se desactiva y lo explica');
+
+  // 11) La herramienta recoge la idea de la landing y la lanza sola
+  const wf = await C.open({ idea: 'Hazme un cartel desde la landing' }); const df = wf.document;
+  ok(await waitFor(() => !df.getElementById('questionsPanel').hidden), 'herramienta: la idea de la landing se lanza sola y aparecen las preguntas');
+  ok(df.getElementById('basicPrompt').value === 'Hazme un cartel desde la landing' && wf.sessionStorage.getItem('pf_idea') === null, 'herramienta: la idea queda escrita y se borra del sessionStorage');
 
   console.log(failures ? `\n${failures} FALLO(S)` : '\nTODO OK');
   return failures;

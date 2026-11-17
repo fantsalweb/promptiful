@@ -4,17 +4,18 @@ Promptiful convierte una idea sencilla («créame un post para mi blog sobre via
 
 La interfaz imita la portada de un buscador (logo con letras de colores y una barra centrada). Los prompts se generan con la API de DeepSeek a través de un backend en **CodeIgniter 4** que oculta la API key y controla el uso.
 
-> **Estado:** prototipo en desarrollo. Esta es la **fase 1** de la migración a CodeIgniter 4: misma funcionalidad que la versión en PHP simple, con prueba gratuita limitada e historial en base de datos. Todavía **no hay cuentas de usuario, panel de administración ni cobros**. Lee [Estado y limitaciones](#estado-y-limitaciones) antes de exponerlo públicamente.
+> **Estado:** prototipo en desarrollo. Esta es la *fase 1* de la migración a CodeIgniter 4: misma funcionalidad que la versión en PHP simple, con prueba gratuita limitada e historial en base de datos. Todavía **no hay cuentas de usuario, panel de administración ni cobros**. Lee [Estado y limitaciones](#estado-y-limitaciones) antes de exponerlo públicamente.
 
 ## Características
 
 - **Preguntas dinámicas.** La IA decide qué falta en tu idea y hace de 2 a 5 preguntas cortas (máximo 2 rondas, también aplicado en el servidor). Cada pregunta lleva un *badge* con el apartado del prompt al que va dirigida.
 - **Prompt de 9 apartados:** Rol, Contexto, Tema, Formato, Tono, Ejemplo, Restricciones, Indicadores de éxito e Instrucción de ejecución, en un cuadro de texto editable.
 - **Tipo de salida** (imagen, texto, código, datos, otro) e **instrucción de ejecución**: el prompt termina con una orden explícita de entrega (por ejemplo, *generar* la imagen en lugar de describirla).
-- **Recomendador de IA.** Ordena ChatGPT, Claude, Perplexity, Copilot, Grok, Gemini, DeepSeek y Mistral según el tipo de prompt, con un podio de tres, el motivo de cada recomendación y el resto de opciones plegadas con sus explicaciones. El orden se obtiene mediante reglas sobre un catálogo editable (`AI_CATALOG` en `app/Views/tool.php`), no lo decide el modelo. La IA indica el tipo de salida y si el prompt necesita fuentes. El prompt se copia al portapapeles y, cuando existe un parámetro de URL `?q=`, se abre ya escrito.
-- **Prueba gratuita sin registro:** 3 consultas en total por navegador (cookie), con un límite más amplio por IP (10) para no castigar a redes compartidas. El contador caduca a los 30 días. Una consulta es un prompt final generado: las rondas de preguntas no cuentan y regenerar sí.
+- **Recomendador de IA.** Ordena ChatGPT, Claude, Perplexity, Copilot, Grok, Gemini, DeepSeek y Mistral según el tipo de prompt, con podio de tres, motivo de cada una y las demás plegadas. El orden sale de reglas sobre un catálogo editable (`AI_CATALOG` en `app/Views/tool.php`), no del modelo. El prompt se copia al portapapeles y, donde existe un parámetro de URL no oficial (`?q=`), se abre ya escrito.
+- **Prueba gratuita sin registro:** 5 consultas **en total** por navegador (cookie), con un tope más holgado por IP (15) para no castigar a redes compartidas. El contador caduca a los 30 días. Una *consulta* es un prompt final generado: las rondas de preguntas no cuentan y regenerar sí.
 - **Historial anónimo en base de datos**, ligado a la cookie del navegador: hasta 5 prompts (los favoritos no se descartan), búsqueda, favoritos, renombrar, copiar y borrar.
 - **Control de abuso y de coste:** límite de peticiones por visitante, tope global diario de gasto (opcional) y registro de los tokens de cada llamada.
+- **Prueba desde la landing:** la portada tiene una barra donde escribir una idea; al enviarla, la herramienta se abre y la lanza sola (la idea viaja por `sessionStorage`, no por la URL) y se muestran las pruebas que quedan.
 - Landing page, modales de ayuda, modo oscuro y diseño adaptable a móvil.
 
 ## Cómo funciona
@@ -26,10 +27,8 @@ La interfaz imita la portada de un buscador (logo con letras de colores y una ba
 | `POST /api/generate` | Conversación con DeepSeek: devuelve preguntas o el prompt final |
 | `GET /api/history`, `POST /api/history` | Historial del navegador (`add`, `get`, `update`, `delete`, `clear`) |
 
-Flujo de la API:
-
-```text
-Api\Generate: CSRF → límite de peticiones → cuota de prueba → tope de gasto
+```
+Api\Generate:  CSRF → límite de peticiones → cuota de prueba → tope de gasto
                → llamada a DeepSeek → validación del JSON → registro de tokens
 ```
 
@@ -38,7 +37,7 @@ Api\Generate: CSRF → límite de peticiones → cuota de prueba → tope de gas
 
 ## Estructura
 
-```text
+```
 app/
 ├── Config/Promptiful.php         Ajustes de Promptiful (se sobrescriben desde .env)
 ├── Controllers/
@@ -49,7 +48,6 @@ app/
 ├── Models/                       HistoryModel, TrialUsageModel, ApiCallModel
 ├── Database/Migrations/          trial_usage, api_calls, history_entries
 └── Views/                        landing.php, tool.php
-
 tests/e2e/                        Prueba de extremo a extremo (DeepSeek simulado + jsdom)
 env                               Plantilla de configuración → copiar a .env
 ```
@@ -88,7 +86,7 @@ Todo se ajusta en `.env` con el prefijo `promptiful.` (los valores por defecto e
 | `maxMessages` / `maxCharsMessage` | `20` / `12000` | Límites de la conversación que acepta el servidor. |
 | `maxQuestionRounds` | `2` | Rondas de preguntas antes de forzar el prompt final. |
 | `rateLimitRequests` / `rateLimitWindow` | `20` / `600` | Peticiones permitidas por visitante en esa ventana (segundos). |
-| `trialPerVisitor` / `trialPerIp` | `3` / `10` | Consultas de prueba por navegador y por IP. |
+| `trialPerVisitor` / `trialPerIp` | `5` / `15` | Consultas de prueba por navegador y por IP. |
 | `trialWindowDays` | `30` | A los cuántos días caduca el contador de la prueba. |
 | `anonHistoryMax` | `5` | Prompts guardados por navegador anónimo. |
 | `dailyBudgetEur` | `0` | Tope global diario en euros (0 = desactivado). |
@@ -128,32 +126,30 @@ Todo se ajusta en `.env` con el prefijo `promptiful.` (los valores por defecto e
 
 - **CodeIgniter 4 en lugar de PHP simple.** Con cuentas, cuotas y un panel de administración en el horizonte, conviene apoyarse en un framework para lo delicado (CSRF, validación, migraciones, sesiones, límites de peticiones).
 - **Una «consulta» es un prompt final generado.** Las rondas de preguntas no cuentan; regenerar sí, porque cuesta una llamada de salida larga.
-- **El recomendador de IA lo deciden reglas, no el modelo.** DeepSeek solo indica el tipo de salida y si el prompt necesita fuentes; el orden sale de un catálogo propio con fecha de revisión visible. Así se evita delegar la selección en un modelo que puede tener sesgos o información desactualizada sobre otras herramientas.
+- **El recomendador de IA lo deciden reglas, no el modelo.** DeepSeek solo indica el tipo de salida y si el prompt necesita fuentes; el orden sale de un catálogo propio con fecha de revisión visible.
 - **Tipo de salida + instrucción de ejecución.** Surgió de un fallo real: con «Hazme un cartel para un concierto» el prompt producía una descripción del diseño en vez de la imagen.
 - **Registro de cada llamada** (tokens y coste estimado): es la base del control de coste y de las futuras métricas.
-- **La API no tiene memoria entre llamadas**, así que el cliente guarda la conversación completa y la reenvía en cada petición. El servidor la valida y le antepone el prompt de sistema.
-- **Contrato JSON explícito** entre el modelo y la interfaz (`questions` / `final`), con modo JSON en la API y validación en el servidor. Si el modelo devuelve algo inesperado, se descarta con un error claro.
 
 ## Pruebas
 
 ```bash
 npm install
-npm run test:e2e      # necesita PHP en el PATH (o PHP_BIN=ruta/a/php) y composer install hecho
+npm run test:e2e      # necesita PHP en el PATH (o PHP_BIN=ruta/a/php) y `composer install` hecho
 ```
 
-La prueba arranca un DeepSeek simulado y la aplicación real con SQLite, abre la herramienta en jsdom y la maneja como una persona. Comprueba, entre otras cosas: el flujo de preguntas y prompt final, los badges, el recomendador, el consumo de la prueba (3 consultas y bloqueo a la cuarta), el historial persistente y aislado por navegador, el rechazo sin token CSRF y el manejo de respuestas inválidas de la IA. Para no tocar tu configuración, usa un `.env` temporal y restaura el tuyo al terminar.
+La prueba arranca un DeepSeek simulado y la aplicación real con SQLite, abre la herramienta en jsdom y la maneja como una persona. Comprueba, entre otras cosas: el flujo de preguntas y prompt final, los badges, el recomendador, el consumo de la prueba (5 consultas y bloqueo a la sexta), la barra de prueba de la landing y el paso de la idea a la herramienta, el historial persistente y aislado por navegador, el rechazo sin token CSRF y el manejo de respuestas inválidas de la IA. Para no tocar tu configuración, usa un `.env` temporal y restaura el tuyo al terminar.
 
 ## Estado y limitaciones
 
 - La prueba de extremo a extremo y las pruebas manuales se han hecho con **SQLite**. Las migraciones y las consultas no se han ejecutado contra MySQL en este entorno.
 - No hay pruebas unitarias con PHPUnit ni pruebas visuales automatizadas ni en varios navegadores.
 - La llamada real a la API de DeepSeek no está cubierta por las pruebas (se simula); su comportamiento depende del modelo y puede variar entre ejecuciones.
-- El catálogo de IAs (`AI_CATALOG` en `app/Views/tool.php`) combina capacidades verificables y *afinidades* editoriales orientativas. Los parámetros `?q=` de cada web no son oficiales: conviene revisarlos periódicamente.
+- El catálogo de IAs (capacidades verificables y *afinidades* editoriales) es orientativo, y los parámetros `?q=` de cada web no son oficiales: conviene revisarlos periódicamente.
 - Los historiales guardados con la versión anterior (ficheros JSON) no se migran.
 
 ## Hoja de ruta
 
-1. **Fase 1 (esta):** migración a CodeIgniter 4, prueba gratuita de 3 consultas e historial anónimo.
+1. **Fase 1 (esta):** migración a CodeIgniter 4, prueba gratuita de 5 consultas e historial anónimo.
 2. **Fase 2:** registro con verificación de email, 20 consultas al mes, historial de 10 en base de datos e importación del historial anónimo.
 3. **Fase 3:** panel de superadministrador con usuarios y métricas (embudo, uso, coste, abuso).
 4. **Más adelante, solo si hay demanda:** plan de pago.
