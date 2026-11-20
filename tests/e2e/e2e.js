@@ -2,7 +2,16 @@
  * Prueba de extremo a extremo: carga la herramienta real (servidor CodeIgniter + base de datos)
  * en jsdom y la maneja como lo haría una persona. La API de DeepSeek está simulada.
  */
-const { JSDOM } = require('jsdom');
+const { JSDOM, VirtualConsole } = require('jsdom');
+const fs = require('fs');
+const path = require('path');
+
+/** Consola de jsdom: se ignora el aviso esperado de «navegación no implementada» (la landing redirige a /app). */
+function quietConsole() {
+  const vc = new VirtualConsole();
+  vc.on('jsdomError', err => { if (!/Not implemented: navigation/.test(err.message)) console.error(err); });
+  return vc;
+}
 
 /** «Navegador» con su propio almacén de cookies (cada uno es un visitante distinto). */
 function makeBrowser(BASE) {
@@ -21,7 +30,7 @@ function makeBrowser(BASE) {
     const html = await resp.text();
     if (!html.includes('id="quotaLine"')) throw new Error(`La herramienta no se cargó (HTTP ${resp.status}): ${html.slice(0, 600)}`);
     const dom = new JSDOM(html, {
-      url: BASE + '/app', runScripts: 'dangerously', pretendToBeVisual: true,
+      url: BASE + '/app', runScripts: 'dangerously', pretendToBeVisual: true, virtualConsole: quietConsole(),
       beforeParse(win) {
         if (opts.idea) win.sessionStorage.setItem('pf_idea', opts.idea);
         win.fetch = bfetch;
@@ -39,7 +48,7 @@ function makeBrowser(BASE) {
   async function openLanding() {
     const res = await bfetch(BASE + '/');
     const html = await res.text();
-    const dom = new JSDOM(html, { url: BASE + '/', runScripts: 'dangerously', pretendToBeVisual: true });
+    const dom = new JSDOM(html, { url: BASE + '/', runScripts: 'dangerously', pretendToBeVisual: true, virtualConsole: quietConsole() });
     return dom.window;
   }
   return { open, openLanding, jar };
@@ -151,6 +160,36 @@ async function runTests(BASE) {
   const wf = await C.open({ idea: 'Hazme un cartel desde la landing' }); const df = wf.document;
   ok(await waitFor(() => !df.getElementById('questionsPanel').hidden), 'herramienta: la idea de la landing se lanza sola y aparecen las preguntas');
   ok(df.getElementById('basicPrompt').value === 'Hazme un cartel desde la landing' && wf.sessionStorage.getItem('pf_idea') === null, 'herramienta: la idea queda escrita y se borra del sessionStorage');
+
+  // 12) Vídeo o GIF de demostración en el hero (se detecta por los archivos de public/media)
+  const mediaDir = path.join(__dirname, '..', '..', 'public', 'media');
+  const demo = n => path.join(mediaDir, n);
+  const heroState = async () => (await C.openLanding()).document.getElementById('heroMedia');
+  const MEDIA = ['demo.gif', 'demo.mp4', 'demo.webm', 'poster.jpg'];
+  // Si ya tienes tu vídeo real en public/media, se aparta durante la prueba y se restaura al terminar
+  fs.mkdirSync(mediaDir, { recursive: true });
+  for (const f of MEDIA) if (fs.existsSync(demo(f))) fs.renameSync(demo(f), demo(f) + '.e2e-backup');
+  try {
+    let h = await heroState();
+    ok(h.dataset.state === 'placeholder' && h.textContent.includes('Próximamente') && !h.querySelector('video, img'), 'hero: sin archivos se ve el hueco «Próximamente»');
+    fs.mkdirSync(mediaDir, { recursive: true });
+    fs.writeFileSync(demo('demo.gif'), 'GIF89a');
+    h = await heroState();
+    ok(h.dataset.state === 'gif' && h.querySelector('img')?.getAttribute('src').endsWith('/media/demo.gif') && h.querySelector('img').alt.length > 20, 'hero: con demo.gif se muestra la imagen con texto alternativo');
+    fs.writeFileSync(demo('demo.mp4'), 'x'); fs.writeFileSync(demo('poster.jpg'), 'x');
+    h = await heroState();
+    const v = h.querySelector('video');
+    ok(h.dataset.state === 'video' && v && v.hasAttribute('controls') && v.getAttribute('poster').endsWith('/media/poster.jpg') && v.querySelector('source[type="video/mp4"]'), 'hero: con demo.mp4 el vídeo tiene controles, póster y su fuente (y prevalece sobre el GIF)');
+    fs.writeFileSync(demo('demo.webm'), 'x');
+    ok((await heroState()).querySelectorAll('source').length === 2, 'hero: con demo.webm y demo.mp4 se ofrecen las dos fuentes');
+    for (const f of MEDIA) fs.rmSync(demo(f), { force: true });
+    ok((await heroState()).dataset.state === 'placeholder', 'hero: al quitar los archivos vuelve el hueco');
+  } finally {
+    for (const f of MEDIA) {
+      fs.rmSync(demo(f), { force: true });
+      if (fs.existsSync(demo(f) + '.e2e-backup')) fs.renameSync(demo(f) + '.e2e-backup', demo(f));
+    }
+  }
 
   console.log(failures ? `\n${failures} FALLO(S)` : '\nTODO OK');
   return failures;

@@ -123,15 +123,19 @@
   .cta-row { display: flex; flex-wrap: wrap; gap: 12px; }
   .fineprint { margin: 16px 0 0; font-size: 14px; color: var(--muted); }
 
-  .mock { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 20px; box-shadow: var(--shadow-lg); }
-  .mock-label { margin: 0 0 8px; font-size: 12px; font-weight: 500; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); }
-  .mock-input { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 26px; font-size: 15px; }
-  .mock-input svg { flex: none; width: 20px; height: 20px; fill: var(--muted); }
-  .mock-arrow { text-align: center; margin: 8px 0; font-size: 22px; color: var(--muted); }
-  .mock-prompt { background: var(--chip); border-radius: 12px; padding: 14px 16px; font-size: 14px; line-height: 1.55; }
-  .mock-prompt p { margin: 0 0 10px; }
-  .mock-prompt p:last-child { margin: 0; }
-  .more { color: var(--muted); }
+
+  /* Vídeo o GIF de demostración (o su hueco) */
+  .hero-media {
+    position: relative; overflow: hidden; aspect-ratio: 16 / 9; background: var(--chip);
+    border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow-lg);
+  }
+  .hero-media::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 6px; z-index: 1; background: linear-gradient(90deg, var(--blue) 0 25%, var(--red) 25% 50%, var(--yellow) 50% 75%, var(--green) 75% 100%); }
+  .hero-media video, .hero-media img { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .media-placeholder { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center; }
+  .media-placeholder strong { font-family: "Product Sans", "Google Sans", Outfit, sans-serif; font-size: 20px; font-weight: 500; }
+  .media-placeholder span:last-child { font-size: 14px; color: var(--muted); }
+  .play { display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 6px; border-radius: 50%; background: var(--btn); }
+  .play svg { width: 32px; height: 32px; fill: #fff; }
 
   /* Etiquetas con el color del logo (fondo suave: el texto siempre es legible) */
   .tag {
@@ -272,21 +276,22 @@
         <p class="fineprint">No hace falta saber de prompt engineering.</p>
       </div>
 
-      <div class="mock" aria-hidden="true">
-        <p class="mock-label">Tu idea</p>
-        <div class="mock-input">
-          <svg viewBox="0 0 24 24"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/></svg>
-          <span>créame un post para mi blog sobre viajes por América</span>
-        </div>
-        <div class="mock-arrow">↓</div>
-        <p class="mock-label">Tu prompt Promptiful</p>
-        <div class="mock-prompt">
-          <p><span class="tag c-blue">Rol</span>Actúa como una periodista de viajes con 10 años de experiencia en Latinoamérica.</p>
-          <p><span class="tag c-red">Contexto</span>Blog de viajes low cost; lectores jóvenes que preparan su primer viaje a América.</p>
-          <p><span class="tag c-yellow">Tema</span>Las 5 mejores rutas para recorrer América del Sur en un mes.</p>
-          <p><span class="tag c-green">Formato</span>Título, introducción, 5 apartados y conclusión (800-1.000 palabras).</p>
-          <p class="more">+ Tono, ejemplo, restricciones, indicadores de éxito e instrucción de ejecución</p>
-        </div>
+      <div class="hero-media" id="heroMedia" data-state="<?= esc($media['state'], 'attr') ?>">
+        <?php if ($media['state'] === 'video'): ?>
+          <video controls preload="metadata" playsinline aria-label="Vídeo de demostración de Promptiful"<?= $media['poster'] ? ' poster="' . esc(base_url('media/poster.jpg'), 'attr') . '"' : '' ?>>
+            <?php if ($media['webm']): ?><source src="<?= esc(base_url('media/demo.webm'), 'attr') ?>" type="video/webm"><?php endif; ?>
+            <?php if ($media['mp4']): ?><source src="<?= esc(base_url('media/demo.mp4'), 'attr') ?>" type="video/mp4"><?php endif; ?>
+            Tu navegador no puede reproducir este vídeo.
+          </video>
+        <?php elseif ($media['state'] === 'gif'): ?>
+          <img src="<?= esc(base_url('media/demo.gif'), 'attr') ?>" alt="Demostración de Promptiful: se escribe una idea, se responden unas preguntas y se obtiene el prompt profesional.">
+        <?php else: ?>
+          <div class="media-placeholder" role="img" aria-label="Aquí irá el vídeo de demostración de Promptiful, próximamente">
+            <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>
+            <strong>Vídeo de demostración</strong>
+            <span>Próximamente: Promptiful en menos de un minuto</span>
+          </div>
+        <?php endif; ?>
       </div>
     </div>
   </section>
