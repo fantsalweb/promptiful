@@ -131,3 +131,7 @@ _modules/*
 node_modules/
 *.sqlite
 .env.e2e-backup
+*.e2e-backup
+
+# Copias locales del .env (contienen secretos)
+.env.*

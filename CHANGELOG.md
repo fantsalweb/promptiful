@@ -87,3 +87,16 @@ El proyecto se subió en **un único commit** con su estado de entonces, precedi
 - La prueba gratuita sube de 3 a **5 consultas** por navegador en una ventana de 30 días, y el tope por IP de 10 a 15.
 - La prueba de extremo a extremo cubre la barra de la landing y el paso de la idea (32 comprobaciones).
 
+## Hito 13 · Hueco para el vídeo de demostración
+
+- La maqueta estática del hero se sustituye por un hueco multimedia con la franja de los cuatro colores.
+- Si existe `public/media/demo.mp4` (o `.webm`) se muestra el vídeo con controles y, si hay `poster.jpg`, su imagen previa; si no, `demo.gif`; y si no hay nada, un hueco «Próximamente». No hace falta tocar código.
+- La prueba de extremo a extremo cubre los tres estados (36 comprobaciones).
+
+## Hito 14 · Prueba de extremo a extremo más robusta (Windows)
+
+- El ejecutor arranca el servidor integrado de PHP directamente en lugar de `php spark serve`: en Windows, parar `spark serve` dejaba vivo el proceso hijo, que seguía bloqueando la base de datos de la prueba y ocupando el puerto.
+- La limpieza devuelve primero tu `.env`, mata el árbol de procesos y reintenta el borrado de la base de datos sin fallar.
+- Salvaguardas al empezar: si existe `.env.e2e-backup` o los puertos están ocupados, se niega a arrancar con un mensaje claro en lugar de pisar tu configuración.
+- Se silencia el aviso esperado de jsdom «navegación no implementada» al enviar la barra de la landing.
+

@@ -16,6 +16,7 @@ La interfaz imita la portada de un buscador (logo con letras de colores y una ba
 - **Historial anónimo en base de datos**, ligado a la cookie del navegador: hasta 5 prompts (los favoritos no se descartan), búsqueda, favoritos, renombrar, copiar y borrar.
 - **Control de abuso y de coste:** límite de peticiones por visitante, tope global diario de gasto (opcional) y registro de los tokens de cada llamada.
 - **Prueba desde la landing:** la portada tiene una barra donde escribir una idea; al enviarla, la herramienta se abre y la lanza sola (la idea viaja por `sessionStorage`, no por la URL) y se muestran las pruebas que quedan.
+- **Vídeo de demostración en el hero:** la landing muestra el vídeo (o el GIF) que pongas en `public/media/`, sin tocar código. Hasta entonces, un hueco «Próximamente».
 - Landing page, modales de ayuda, modo oscuro y diseño adaptable a móvil.
 
 ## Cómo funciona
@@ -73,6 +74,19 @@ php spark serve
 ```
 
 Abre `http://localhost:8080/` (landing) y `http://localhost:8080/app` (herramienta). Para probar sin MySQL, en `.env` usa `database.default.DBDriver = SQLite3` y `database.default.database = promptiful.sqlite`.
+
+## Vídeo de demostración
+
+Copia los archivos a `public/media/` y la landing los usa sola:
+
+| Archivo | Qué hace |
+|---|---|
+| `demo.mp4` | Vídeo principal (H.264), con controles. |
+| `demo.webm` | Opcional: versión WebM. |
+| `poster.jpg` | Opcional: imagen previa a la reproducción. |
+| `demo.gif` | Alternativa: solo si no hay vídeo. |
+
+Recomendado: 16:9 (por ejemplo, 1280×720), de 30 a 60 s, por debajo de 10 MB y sin depender del sonido (o con subtítulos). Un vídeo pesa menos y es más accesible que un GIF. Si es grande, mejor no subirlo al repositorio: ponlo directamente en el servidor o usa una plataforma de vídeo.
 
 ## Configuración
 
@@ -137,7 +151,7 @@ npm install
 npm run test:e2e      # necesita PHP en el PATH (o PHP_BIN=ruta/a/php) y `composer install` hecho
 ```
 
-La prueba arranca un DeepSeek simulado y la aplicación real con SQLite, abre la herramienta en jsdom y la maneja como una persona. Comprueba, entre otras cosas: el flujo de preguntas y prompt final, los badges, el recomendador, el consumo de la prueba (5 consultas y bloqueo a la sexta), la barra de prueba de la landing y el paso de la idea a la herramienta, el historial persistente y aislado por navegador, el rechazo sin token CSRF y el manejo de respuestas inválidas de la IA. Para no tocar tu configuración, usa un `.env` temporal y restaura el tuyo al terminar.
+La prueba arranca un DeepSeek simulado y la aplicación real con SQLite, abre la herramienta en jsdom y la maneja como una persona. Comprueba, entre otras cosas: el flujo de preguntas y prompt final, los badges, el recomendador, el consumo de la prueba (5 consultas y bloqueo a la sexta), la barra de prueba de la landing y el paso de la idea a la herramienta, el historial persistente y aislado por navegador, el rechazo sin token CSRF y el manejo de respuestas inválidas de la IA. Para no tocar tu configuración, usa un `.env` temporal y restaura el tuyo al terminar (si una ejecución se interrumpe, tu configuración queda en `.env.e2e-backup`: la prueba se niega a arrancar hasta que la restaures). Necesita libres los puertos 8765 y 8099.
 
 ## Estado y limitaciones
 
